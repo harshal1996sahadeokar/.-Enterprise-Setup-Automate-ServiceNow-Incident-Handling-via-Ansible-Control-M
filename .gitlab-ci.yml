@@ -7,4 +7,4 @@ incident_auto_resolve:
   before_script:
     - pip install ansible
   script:
-    - ansible-playbook resolve_snow_controlm.yml --ask-vault-pass
+    - ansible-playbook playbooks/resolve_snow_controlm.yml --vault-password-file ~/.vault_pass.txt
