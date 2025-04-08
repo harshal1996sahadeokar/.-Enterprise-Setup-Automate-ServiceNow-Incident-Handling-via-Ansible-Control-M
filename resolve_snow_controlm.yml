@@ -1,0 +1,72 @@
+- name: Resolve ServiceNow Incident by Triggering Control-M Job
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - secrets.yml
+
+  vars:
+    servicenow_instance: "https://yourinstance.service-now.com"
+    controlm_url: "https://controlm.example.com:8443"
+    incident_sys_id: "your_incident_sys_id"
+
+  tasks:
+
+    - name: Get ServiceNow Access Token using Refresh Token
+      uri:
+        url: "{{ servicenow_instance }}/oauth_token.do"
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        body_format: form-urlencoded
+        body:
+          grant_type: refresh_token
+          client_id: "{{ client_id }}"
+          client_secret: "{{ client_secret }}"
+          refresh_token: "{{ refresh_token }}"
+      register: token_response
+      no_log: true
+
+    - name: Save Access Token
+      set_fact:
+        servicenow_token: "{{ token_response.json.access_token }}"
+
+    - name: Fetch ServiceNow Incident Details
+      uri:
+        url: "{{ servicenow_instance }}/api/now/table/incident/{{ incident_sys_id }}"
+        method: GET
+        headers:
+          Accept: "application/json"
+          Authorization: "Bearer {{ servicenow_token }}"
+      register: incident_info
+
+    - name: Print Incident Summary
+      debug:
+        msg: "Incident: {{ incident_info.json.result.short_description }}"
+
+    - name: Trigger Control-M Job
+      uri:
+        url: "{{ controlm_url }}/automation-api/run/job"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ controlm_token }}"
+        body_format: json
+        body: |
+          {
+            "jobName": "RecoveryJob"
+          }
+      register: controlm_response
+
+    - name: Update ServiceNow Incident with Job Result
+      uri:
+        url: "{{ servicenow_instance }}/api/now/table/incident/{{ incident_sys_id }}"
+        method: PATCH
+        headers:
+          Content-Type: application/json
+          Authorization: "Bearer {{ servicenow_token }}"
+        body_format: json
+        body: |
+          {
+            "state": "In Progress",
+            "comments": "Triggered Control-M job. Status: {{ controlm_response.status }}"
+          }
