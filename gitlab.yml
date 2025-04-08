@@ -1,0 +1,10 @@
+stages:
+  - automate_incident
+
+incident_auto_resolve:
+  stage: automate_incident
+  image: python:3.9
+  before_script:
+    - pip install ansible
+  script:
+    - ansible-playbook resolve_snow_controlm.yml --ask-vault-pass
